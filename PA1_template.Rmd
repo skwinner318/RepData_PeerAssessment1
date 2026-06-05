@@ -1,25 +1,71 @@
 ---
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
+title: "RepData Peer Review 1"
+author: "Sydney Winner"
+date: "2026-06-05"
+output: html_document
 ---
-
-
 ## Loading and preprocessing the data
-
-
-
+```{r, echo=TRUE}
+library(dplyr)
+activity_data <- read.csv(file="activity.csv", sep=",")
+```
 ## What is mean total number of steps taken per day?
 
+Mean steps per day is 10766.19 and Median steps per day is 10765.
 
-
+```{r, echo=TRUE}
+sum_steps <- tapply(activity_data$steps, activity_data$date, sum)
+hist(sum_steps, main="Histogram of Total Steps per Day", xlab="Total Steps")
+mean(sum_steps, na.rm=TRUE)
+median(sum_steps, na.rm=TRUE)
+```
 ## What is the average daily activity pattern?
 
+Maximum steps occur at interval 835 with a max step value of 206.1698.
 
-
+```{r, echo=TRUE}
+int_steps <- aggregate(steps ~ interval, activity_data, mean)
+plot(int_steps$interval, int_steps$steps, type="l", main="Time Series of Avg Steps", xlab="5-min Interval", ylab="Avg Steps")
+max(int_steps$steps)
+max_int<-which.max(int_steps$steps)
+int_steps[max_int,"interval"][[1]]
+```
 ## Imputing missing values
 
+Mean steps is still the same value of 10766.19 however the median has changed to also 10766.19. It appears imputing missing value data has an impact on median more than mean.
 
-
+```{r, echo=TRUE}
+Na <- is.na(activity_data$steps)
+sum(Na)
+activity_imputed <- activity_data
+for (i in 1:nrow(activity_imputed)) {
+  if (is.na(activity_imputed$steps[i])) {
+    interval_value <- activity_imputed$interval[i]
+    steps_value <- int_steps[
+      int_steps$interval == interval_value,]
+    activity_imputed$steps[i] <- steps_value$steps
+  }
+}
+imputed_day_steps <- aggregate(steps ~ date, activity_imputed, sum)
+hist(imputed_day_steps$steps, main="Histogram of Total Steps each Day", xlab="Total Steps")
+mean(imputed_day_steps$steps)
+median(imputed_day_steps$steps)
+```
 ## Are there differences in activity patterns between weekdays and weekends?
+```{r, echo=TRUE}
+activity_imputed<-mutate(activity_imputed, weekday=weekdays(as.Date(activity_imputed$date)))
+activity_imputed<-mutate(activity_imputed, weekend= if_else(weekday=="Saturday" | weekday=="Sunday", TRUE, FALSE))
+activity_weekend<-filter(activity_imputed, weekend==TRUE)
+activity_weekday<-filter(activity_imputed, weekend==FALSE)
+
+int_steps_weekday<-activity_weekday %>% 
+        group_by(interval) %>% 
+        summarise(avg_steps=mean(steps, na.rm=TRUE))
+int_steps_weekend<-activity_weekend %>% 
+        group_by(interval) %>% 
+        summarise(avg_steps=mean(steps, na.rm=TRUE))
+
+par(mfrow=c(2,1))
+with(int_steps_weekday, plot(avg_steps ~ interval, type="l"))
+with(int_steps_weekend, plot(avg_steps ~ interval, type="l", ylim=c(0,250)))
+```
